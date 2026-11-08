@@ -1,0 +1,16 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+# редакторы и ОС
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# локальная лаборатория (не часть книги)
+docker-lab/
+*.sql

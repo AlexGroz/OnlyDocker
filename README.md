@@ -1,5 +1,7 @@
 # OnlyDocker — книга-тренажёр по Docker и Kubernetes
 
+**Читать онлайн:** https://alexgroz.github.io/OnlyDocker/
+
 Практический курс: один сквозной проект (.NET minimal API + PostgreSQL + RabbitMQ),
 который шаг за шагом упаковывается в контейнеры, собирается в образы, поднимается
 Compose-файлом и уезжает в Kubernetes.

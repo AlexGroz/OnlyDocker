@@ -1,0 +1,27 @@
+# Конфигурация GitHub Pages (Jekyll) для книги.
+# Сборка идёт автоматически при каждом push в main — отдельный workflow не нужен.
+title: Docker и Kubernetes — книга-тренажёр
+description: Практический курс по Docker и Kubernetes на сквозном проекте .NET + PostgreSQL + RabbitMQ
+lang: ru
+theme: jekyll-theme-primer
+
+markdown: kramdown
+kramdown:
+  input: GFM          # поддержка таблиц и зачёркивания как на GitHub
+  syntax_highlighter: rouge
+
+# Плагины из белого списка GitHub Pages:
+# - optional-front-matter: превращать .md без заголовка в HTML-страницы
+# - readme-index: README.md становится главной страницей
+# - relative-links: ссылки вида «book/05-...md» переписывать в «book/05-....html»
+# - default-layout / titles-from-headings: подставить тему и заголовки из <h1>
+plugins:
+  - jekyll-optional-front-matter
+  - jekyll-readme-index
+  - jekyll-relative-links
+  - jekyll-default-layout
+  - jekyll-titles-from-headings
+  - jekyll-seo-tag
+
+exclude:
+  - .gitignore

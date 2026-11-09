@@ -199,14 +199,44 @@ sudo docker run --rm hello-world
 `--rm` — удалить контейнер сразу после завершения (без него он останется в `docker ps -a`
 со статусом `Exited`); `hello-world` — имя образа без тега, то есть `:latest`.
 
-**Ожидаемо:** текст от образа и строка-подтверждение:
+**Ожидаемо:** на **первом** запуске Docker сначала скачивает образ, потом показывает приветствие:
 
 ```
+Unable to find image 'hello-world:latest' locally
+latest: Pulling from library/hello-world
+4f55086f7dd0: Pull complete
+d5e71e642bf5: Download complete
+Digest: sha256:c567b231f65614688711a75f31518a064258a51d442117a3e771a3a8fdba78ef
+Status: Downloaded newer image for hello-world:latest
+
 Hello from Docker!
 This message shows that your installation appears to be working correctly.
+
+To generate this message, Docker took the following steps:
+ 1. The Docker client contacted the Docker daemon.
+ 2. The Docker daemon pulled the "hello-world" image from the Docker Hub.
+    (amd64)
+ 3. The Docker daemon created a new container from that image which runs the
+    executable that produces the output you are currently reading.
+ 4. The Docker daemon streamed that output to the Docker client, which sent it
+    to your terminal.
 ```
 
-А в `docker ps -a` контейнера после этого нет — его удалил `--rm`.
+Как читать этот вывод:
+
+| Строки | Что это |
+|---|---|
+| `Unable to find image … locally` | образа не было в локальном кэше — поэтому Docker пошёл в Docker Hub |
+| `Pulling from library/hello-world` + `Pull complete` / `Download complete` | слои образа скачиваются (у hello-world их два) |
+| `Digest: sha256:…` | **неизменяемый** отпечаток образа; о нём подробно в главе 2 |
+| `Status: Downloaded newer image …` | образ скачан и лежит локально |
+| `Hello from Docker!` и 4 пункта | сам контейнер отработал и объяснил, что произошло |
+| `(amd64)` | архитектура, под которую скачан образ (на ARM будет `arm64`) |
+
+Дальше идёт реклама от образа (`To try something more ambitious…`) — её можно не читать.
+
+**При повторном запуске** строк про скачивание уже не будет: образ в кэше, вывод сразу начинается
+с `Hello from Docker!`. А в `docker ps -a` контейнера после этого нет — его удалил `--rm`.
 
 Если `docker ps` под своим пользователем отвечает `permission denied`, добавь себя в группу:
 `sudo adduser $USER docker`, затем перелогинься.
@@ -303,8 +333,9 @@ sudo docker run --rm hello-world
 
 **Ключи:** те же, что выше: `run` — создать и запустить, `--rm` — удалить после выхода.
 
-**Ожидаемо:** тот же вывод, что и в способе 1 — `Hello from Docker!` и строка
-`This message shows that your installation appears to be working correctly.`
+**Ожидаемо:** тот же вывод, что и в способе 1 (раздел 1.3): сначала строки про скачивание
+(`Unable to find image … locally`, `Pulling from …`, `Digest: sha256:…`, `Status: Downloaded…`),
+затем `Hello from Docker!` и объяснение из 4 пунктов. Если образ уже в кэше — скачивания не будет.
 
 **Проверка 5 — откуда взялась версия:**
 
@@ -676,12 +707,11 @@ sudo docker run --rm hello-world
 
 **Ключи:** `run` — создать и запустить контейнер; `--rm` — удалить его после выхода.
 
-**Ожидаемо:** текст от образа и прощальная строка:
-
-```
-Hello from Docker!
-This message shows that your installation appears to be working correctly.
-```
+**Ожидаемо:** тот же вывод, что в разделе 1.3 — при первом запуске сначала скачивание
+(`Unable to find image … locally`, `Digest: sha256:…`, `Status: Downloaded…`), потом
+`Hello from Docker!` и 4 пункта объяснения. Плюс одна деталь именно этого способа: строка
+`[sudo: authenticate] Password:` — это **не** Docker просит пароль, а `sudo` (ты ещё не в группе,
+см. шаг 6). После шага 6 команда пойдёт без пароля.
 
 А в `docker ps -a` контейнера после этого **нет** — его удалил `--rm`.
 

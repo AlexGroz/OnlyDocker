@@ -317,7 +317,8 @@ systemctl is-active docker; systemctl is-enabled docker
 docker version --format 'server {{.Server.Version}}'; docker compose version; docker buildx version
 ```
 
-**Ключи:** `--format` — шаблон Go (см. выше), здесь печатаем только версию **демона**;
+**Ключи:** `--format` — шаблон Go, `{{…}}` подставляет поле из ответа; здесь печатаем только версию
+**демона**;
 `docker compose version` и `docker buildx version` — не самостоятельные программы, а **плагины**
 CLI; если плагина нет, Docker ответит `'compose' is not a docker command`.
 
@@ -333,9 +334,33 @@ sudo docker run --rm hello-world
 
 **Ключи:** те же, что выше: `run` — создать и запустить, `--rm` — удалить после выхода.
 
-**Ожидаемо:** тот же вывод, что и в способе 1 (раздел 1.3): сначала строки про скачивание
-(`Unable to find image … locally`, `Pulling from …`, `Digest: sha256:…`, `Status: Downloaded…`),
-затем `Hello from Docker!` и объяснение из 4 пунктов. Если образ уже в кэше — скачивания не будет.
+**Ожидаемо:** на первом запуске Docker сначала скачивает образ, потом печатает приветствие:
+
+```
+Unable to find image 'hello-world:latest' locally
+latest: Pulling from library/hello-world
+4f55086f7dd0: Pull complete
+d5e71e642bf5: Download complete
+Digest: sha256:…      ← у тебя будет свой отпечаток (зависит от версии образа)
+Status: Downloaded newer image for hello-world:latest
+
+Hello from Docker!
+This message shows that your installation appears to be working correctly.
+
+To generate this message, Docker took the following steps:
+ 1. The Docker client contacted the Docker daemon.
+ 2. The Docker daemon pulled the "hello-world" image from the Docker Hub.
+    (amd64)
+ 3. The Docker daemon created a new container from that image which runs the
+    executable that produces the output you are currently reading.
+ 4. The Docker daemon streamed that output to the Docker client, which sent it
+    to your terminal.
+```
+
+Здесь: `Status: Downloaded newer image` — образ скачался из Docker Hub, `(amd64)` — архитектура
+(на ARM было бы `arm64`), `Digest` — отпечаток версии образа. Дальше образ печатает рекламу
+(`To try something more ambitious…`) — читать не обязательно.
+В `docker ps -a` контейнера после этого нет — его удалил `--rm`.
 
 **Проверка 5 — откуда взялась версия:**
 
@@ -707,13 +732,33 @@ sudo docker run --rm hello-world
 
 **Ключи:** `run` — создать и запустить контейнер; `--rm` — удалить его после выхода.
 
-**Ожидаемо:** тот же вывод, что в разделе 1.3 — при первом запуске сначала скачивание
-(`Unable to find image … locally`, `Digest: sha256:…`, `Status: Downloaded…`), потом
-`Hello from Docker!` и 4 пункта объяснения. Плюс одна деталь именно этого способа: строка
-`[sudo: authenticate] Password:` — это **не** Docker просит пароль, а `sudo` (ты ещё не в группе,
-см. шаг 6). После шага 6 команда пойдёт без пароля.
+**Ожидаемо:** на первом запуске Docker сначала скачивает образ, потом печатает приветствие:
 
-А в `docker ps -a` контейнера после этого **нет** — его удалил `--rm`.
+```
+Unable to find image 'hello-world:latest' locally
+latest: Pulling from library/hello-world
+4f55086f7dd0: Pull complete
+d5e71e642bf5: Download complete
+Digest: sha256:…      ← у тебя будет свой отпечаток (зависит от версии образа)
+Status: Downloaded newer image for hello-world:latest
+
+Hello from Docker!
+This message shows that your installation appears to be working correctly.
+
+To generate this message, Docker took the following steps:
+ 1. The Docker client contacted the Docker daemon.
+ 2. The Docker daemon pulled the "hello-world" image from the Docker Hub.
+    (amd64)
+ 3. The Docker daemon created a new container from that image which runs the
+    executable that produces the output you are currently reading.
+ 4. The Docker daemon streamed that output to the Docker client, which sent it
+    to your terminal.
+```
+
+Строка `[sudo: authenticate] Password:` выше в твоём терминале — это **не** Docker просит пароль,
+а `sudo` (ты ещё не в группе `docker`). После шага 6 команда пойдёт без пароля.
+
+В `docker ps -a` контейнера после этого нет — его удалил `--rm`.
 
 **Проверка 5 — плагины `compose` и `buildx` на месте:**
 

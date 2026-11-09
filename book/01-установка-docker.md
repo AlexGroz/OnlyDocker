@@ -165,6 +165,12 @@ docker version --format 'CLI {{.Client.Version}} / server {{.Server.Version}}'
 ответа демона. `.Client` — твой CLI, `.Server` — демон, `.Version` — номер версии. Тот же приём
 работает во всех командах Docker: `docker inspect -f '{{.State.Status}}' <имя>`.
 
+**Ожидаемо:** обе части заполнены и совпадают — snap ставит клиент и демон одной версии:
+
+```
+CLI 29.8.0 / server 29.8.0
+```
+
 **Проверка 3 — где snap держит данные:**
 
 ```bash
@@ -190,6 +196,15 @@ sudo docker run --rm hello-world
 **Ключи:** `docker run <образ>` — создать контейнер из образа и запустить его;
 `--rm` — удалить контейнер сразу после завершения (без него он останется в `docker ps -a`
 со статусом `Exited`); `hello-world` — имя образа без тега, то есть `:latest`.
+
+**Ожидаемо:** текст от образа и строка-подтверждение:
+
+```
+Hello from Docker!
+This message shows that your installation appears to be working correctly.
+```
+
+А в `docker ps -a` контейнера после этого нет — его удалил `--rm`.
 
 Если `docker ps` под своим пользователем отвечает `permission denied`, добавь себя в группу:
 `sudo adduser $USER docker`, затем перелогинься.
@@ -242,6 +257,17 @@ dpkg -l | grep -E '^ii +(docker|containerd|runc)' | awk '{print $2, $3}'
 (первая `i` — желаемое состояние, вторая — текущее); `awk '{print $2, $3}'` — оставить только
 2-ю и 3-ю колонки, то есть имя пакета и версию, без служебных флагов.
 
+**Ожидаемо:** пять строк — `docker.io`, `docker-buildx`, `docker-compose-v2`, `containerd`, `runc`
+(версии у тебя будут другими):
+
+```
+docker.io 29.1.3-0ubuntu4.1
+containerd 2.x.y-0ubuntu…
+runc 1.x.y-0ubuntu…
+docker-buildx 0.30.1-0ubuntu1
+docker-compose-v2 2.40.3+ds1-0ubuntu1
+```
+
 **Проверка 2 — сервис поднялся и включён в автозапуск:**
 
 ```bash
@@ -275,6 +301,9 @@ sudo docker run --rm hello-world
 
 **Ключи:** те же, что выше: `run` — создать и запустить, `--rm` — удалить после выхода.
 
+**Ожидаемо:** тот же вывод, что и в способе 1 — `Hello from Docker!` и строка
+`This message shows that your installation appears to be working correctly.`
+
 **Проверка 5 — откуда взялась версия:**
 
 ```bash
@@ -284,6 +313,18 @@ apt-cache policy docker.io | sed -n '1,4p'
 **Ключи:** `apt-cache policy <пакет>` — установленная и доступная версии и их источник;
 `sed -n '1,4p'` — показать только первые 4 строки (там уже есть всё нужное, дальше идёт длинная
 таблица версий).
+
+**Ожидаемо:**
+
+```
+docker.io:
+  Installed: 29.1.3-0ubuntu4.1
+  Candidate: 29.1.3-0ubuntu4.1
+  Version table:
+```
+
+Главное здесь — источник в таблице версий: `ru.archive.ubuntu.com/ubuntu … universe`,
+то есть пакет пришёл **из Ubuntu**, а не с `download.docker.com`.
 
 > **В проде:** этот способ плох тем, что версию Docker определяет Ubuntu, и обновление
 > системы может внезапно обновить демон. Зато минимум действий и нет сторонних репозиториев —
@@ -314,6 +355,15 @@ dpkg -l | grep -cE '^ii +(docker|containerd|runc)'
 **Ключи:** `command -v` — путь к бинарнику (пусто = не установлен); `systemctl is-active` — состояние
 сервиса; `ls … 2>/dev/null` — проверить каталоги, не показывая ошибку, если их нет;
 `dpkg -l | grep -cE '^ii …'` — посчитать установленные пакеты (`0` = чисто).
+
+**Ожидаемо:** три сообщения и ноль:
+
+```
+CLI удалён
+сервис неактивен
+каталоги данных удалены
+0
+```
 
 ## 1.5. Способ 3 из 3: официальный репозиторий Docker (его и оставляем)
 
@@ -461,6 +511,12 @@ sudo apt update
 cat /etc/apt/sources.list.d/docker.list
 ```
 
+**Ожидаемо:** ровно одна строка (у тебя — с твоим кодовым именем и архитектурой):
+
+```
+deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu resolute stable
+```
+
 **Проверка 2 — самый важный тест: `apt` теперь знает про `docker-ce`:**
 
 ```bash
@@ -486,64 +542,13 @@ sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin d
 рантайм (отдельный, свежий), `docker-buildx-plugin` — сборка образов, `docker-compose-plugin` —
 `docker compose`.
 
-**Проверка 1 — версия сервера (сравни с 29.1.3 у `docker.io`):**
+**Сначала — группа `docker`, только потом проверки.** Сразу после установки твой пользователь ещё
+не состоит в группе `docker`, поэтому любой `docker …` **без** `sudo` ответит
+`permission denied while trying to connect to the Docker daemon socket at unix:///var/run/docker.sock`.
+Это не поломка установки, а обычные права доступа: сокет принадлежит `root:docker`. Поэтому
+следующий шаг — группа, а все проверки собраны в шаге 7.
 
-```bash
-docker version --format 'CLI {{.Client.Version}} / server {{.Server.Version}} '
-docker version --format 'API {{.Server.APIVersion}} / Go {{.Server.GoVersion}}'
-```
-
-**Ключи:** `--format` — шаблон Go; `.Client` — твой CLI, `.Server` — демон;
-`.APIVersion` — версия HTTP API (важна для совместимости инструментов), `.GoVersion` — на какой
-версии Go собран демон. Две команды — потому что в одном шаблоне удобно держать одну тему.
-
-**Проверка 2 — сервис:**
-
-```bash
-systemctl is-active docker; systemctl is-enabled docker; systemctl status docker --no-pager | head -5
-```
-
-**Ключи:** `is-active` и `is-enabled` объяснены выше; `status` — полный статус юнита (последние
-строчки лога, главный PID, cgroup); `--no-pager` — не открывать `less` (иначе вывод «залипнет»
-в ожидании `q`); `head -5` — первые пять строк.
-
-**Проверка 3 — что демон о себе думает:**
-
-```bash
-docker info --format 'root={{.DockerRootDir}} driver={{.Driver}} cgroup={{.CgroupVersion}} runtime={{.DefaultRuntime}}'
-```
-
-**Ключи:** `--format` с полями: `.DockerRootDir` — где лежат образы и тома, `.Driver` — драйвер
-слоёв (`overlay2` — норма), `.CgroupVersion` — версия cgroup (ждём `2`), `.DefaultRuntime` — чем
-запускаются контейнеры (`runc`).
-
-**Ожидаемо:** `root=/var/lib/docker`, `driver=overlay2`, `cgroup=2`, `runtime=runc`.
-
-**Проверка 4 — контейнер запускается:**
-
-```bash
-sudo docker run --rm hello-world
-```
-
-**Ключи:** `run` — создать и запустить контейнер; `--rm` — удалить его после выхода.
-
-**Проверка 5 — плагины:**
-
-```bash
-docker compose version && docker buildx version
-```
-
-**Проверка 6 — журнал демона (пригодится при любой проблеме):**
-
-```bash
-journalctl -u docker --no-pager -n 10
-```
-
-**Ключи:** `-u docker` (`--unit`) — только записи этого systemd-юнита; `-n 10` (`--lines`)
-последние 10 строк; `--no-pager` — без постраничного просмотра. Это первая команда при любом
-«Docker не стартует»: там будет причина (`invalid JSON`, `failed to start daemon` и т.п.).
-
-### Шаг 6. Работа без `sudo`
+### Шаг 6. Работа без `sudo` — до всех проверок
 
 ```bash
 sudo usermod -aG docker "$USER"
@@ -568,8 +573,141 @@ id -nG | tr ' ' '\n' | grep -x docker && docker ps
 `docker` (иначе совпало бы что-то вроде `docker-compose`); `&&` — `docker ps` выполнится только если
 группа найдена.
 
-**Ожидаемо:** вывелось `docker`, а `docker ps` показал пустую таблицу **без** `sudo`.
-Если всё ещё `permission denied` — группа не применилась к текущей сессии.
+**Ожидаемо:** сначала строка `docker` (ты в группе), затем таблица `docker ps` **без** `sudo` —
+заголовок есть, строк нет, потому что контейнеров пока нет:
+
+```
+docker
+CONTAINER ID   IMAGE     COMMAND   CREATED   STATUS    PORTS     NAMES
+```
+
+**Если видишь `permission denied while trying to connect to the Docker daemon socket …`** — группа
+не применилась к текущей сессии. Это самая частая «поломка» после установки, лечится так:
+
+| Причина | Как убедиться | Что сделать |
+|---|---|---|
+| `usermod` ещё не выполнялся | `getent group docker` — тебя нет в списке | `sudo usermod -aG docker "$USER"` |
+| выполнил, но не переоткрыл сессию | `id -nG` не содержит `docker` | `newgrp docker` (или новый терминал, или перелогин) |
+| терминал открыт до `usermod` | `id -nG` | закрыть и открыть терминал заново |
+| хочешь проверить, что дело именно в группе | `sudo docker ps` работает | значит права, а не установка |
+
+Пока не разобрался — спокойно работай через `sudo docker …`: на результат это не влияет,
+только на удобство.
+
+> **В проде:** членство в группе `docker` = права root без пароля (достаточно
+> `docker run -v /:/host -it alpine chroot /host`). Поэтому на серверах группу либо не дают совсем,
+> либо используют rootless-режим (`dockerd-rootless-setuptool.sh`), либо отдельный хост под сборку.
+
+### Шаг 7. Проверки после установки
+
+Шесть проверок, которые надо уметь выполнять после **любой** установки Docker. У каждой — что
+именно должно быть в выводе.
+
+**Проверка 1 — версии CLI и демона:**
+
+```bash
+docker version --format 'CLI {{.Client.Version}} / server {{.Server.Version}}'
+docker version --format 'API {{.Server.APIVersion}} / Go {{.Server.GoVersion}}'
+```
+
+**Ключи:** `--format` — шаблон Go, `{{…}}` подставляет поле из ответа; `.Client` — твой CLI,
+`.Server` — демон, `.APIVersion` — версия HTTP API (важна для совместимости инструментов),
+`.GoVersion` — на какой версии Go собран демон.
+
+**Ожидаемо:** обе части заполнены, версии CLI и сервера совпадают (и это версия из репозитория
+Docker, а не `29.1.3` из Ubuntu):
+
+```
+CLI 29.x.y / server 29.x.y
+API 1.5x / Go 1.2x
+```
+
+Точные номера зависят от установленной версии; важно, что **ни одно поле не пустое**.
+
+**Если получилось `CLI  / server  ` и следом `permission denied … docker.sock`** — это не версии,
+а права: демон недоступен текущей сессии. Вернись к шагу 6 (группа `docker`) — после этого команда
+выведет значения.
+
+**Проверка 2 — сервис запущен и в автозапуске:**
+
+```bash
+systemctl is-active docker; systemctl is-enabled docker; systemctl status docker --no-pager | head -5
+```
+
+**Ключи:** `is-active` — работает ли сейчас; `is-enabled` — включён ли автозапуск; `status` —
+подробный статус юнита; `--no-pager` — не открывать `less`; `head -5` — первые пять строк.
+
+**Ожидаемо:**
+
+```
+active
+enabled
+● docker.service - Docker Application Container Engine
+     Loaded: loaded (/usr/lib/systemd/system/docker.service; enabled; preset: enabled)
+     Active: active (running) since …
+```
+
+**Проверка 3 — что демон о себе думает:**
+
+```bash
+docker info --format 'root={{.DockerRootDir}} driver={{.Driver}} cgroup={{.CgroupVersion}} runtime={{.DefaultRuntime}}'
+```
+
+**Ключи:** `--format` с полями: `.DockerRootDir` — где лежат образы и тома, `.Driver` — драйвер
+слоёв (`overlay2` — норма), `.CgroupVersion` — версия cgroup (ждём `2`), `.DefaultRuntime` — чем
+запускаются контейнеры (`runc`).
+
+**Ожидаемо:** `root=/var/lib/docker driver=overlay2 cgroup=2 runtime=runc`.
+
+**Проверка 4 — контейнер запускается:**
+
+```bash
+sudo docker run --rm hello-world
+```
+
+**Ключи:** `run` — создать и запустить контейнер; `--rm` — удалить его после выхода.
+
+**Ожидаемо:** текст от образа и прощальная строка:
+
+```
+Hello from Docker!
+This message shows that your installation appears to be working correctly.
+```
+
+А в `docker ps -a` контейнера после этого **нет** — его удалил `--rm`.
+
+**Проверка 5 — плагины `compose` и `buildx` на месте:**
+
+```bash
+docker compose version && docker buildx version
+```
+
+**Ключи:** `docker compose version` и `docker buildx version` обращаются к **плагинам** CLI;
+`&&` — вторая команда выполнится, только если первая успешна.
+
+**Ожидаемо:** две строки с версиями:
+
+```
+Docker Compose version v2.x.y
+github.com/docker/buildx v0.x.y
+```
+
+Если вместо этого `docker: 'compose' is not a docker command` — не установлен пакет
+`docker-compose-plugin`: `sudo apt install -y docker-compose-plugin`.
+
+**Проверка 6 — журнал демона (пригодится при любой проблеме):**
+
+```bash
+journalctl -u docker --no-pager -n 10
+```
+
+**Ключи:** `-u docker` (`--unit`) — только записи этого systemd-юнита; `-n 10` (`--lines`)
+последние 10 строк; `--no-pager` — без постраничного просмотра.
+
+**Ожидаемо:** строки вида `level=info msg="Daemon has completed initialization"` и
+`API listen on /var/run/docker.sock` — демон поднялся без ошибок. Если видишь
+`failed to start daemon` — читай текст внутри: там причина (`invalid JSON` в `daemon.json`,
+занятый порт, нет прав на каталог).
 
 ## 1.6. Настройка демона «как в проде»
 
@@ -600,6 +738,10 @@ sudo systemctl restart docker
 ```bash
 sudo jq . /etc/docker/daemon.json > /dev/null && echo "JSON валиден"
 ```
+
+**Ожидаемо:** `JSON валиден`. Если вывода нет — `jq` нашёл синтаксическую ошибку (и тогда Docker
+после перезапуска не поднимется): запусти `sudo jq . /etc/docker/daemon.json` без перенаправления
+и посмотри, на какой строке ругается.
 
 **Проверка 2 — демон принял настройки:**
 
@@ -638,6 +780,15 @@ docker compose version
 
 **Ключи:** `run --rm` — запустить и сразу удалить контейнер; `head -3` — первые три строки вывода
 (проверяем, что демон вообще работает); `compose version` — что плагин на месте.
+
+**Ожидаемо:** первые три строки `Hello from Docker! …`, затем версия плагина:
+
+```
+Hello from Docker!
+This message shows that your installation appears to be working correctly.
+
+Docker Compose version v2.x.y
+```
 
 > **В проде:** рядом с `daemon.json` обычно живут `data-root` (перенос данных на отдельный диск)
 > и `default-address-pools` (когда стандартная подсеть `172.17.0.0/16` конфликтует с корпоративной

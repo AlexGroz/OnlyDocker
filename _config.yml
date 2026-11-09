@@ -9,9 +9,6 @@ markdown: kramdown
 kramdown:
   input: GFM               # поддержка таблиц и зачёркивания как на GitHub
   syntax_highlighter: rouge
-  # без этого markdown внутри <details> (спойлеры «Показать команды») не
-  # разбирается: код рендерится сырым текстом с бэктиками
-  parse_block_html: true
 
 # Плагины из белого списка GitHub Pages:
 # - optional-front-matter: превращать .md без заголовка в HTML-страницы

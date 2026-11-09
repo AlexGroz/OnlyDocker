@@ -222,6 +222,11 @@ To generate this message, Docker took the following steps:
     to your terminal.
 ```
 
+**Про запрос пароля:** если первой строкой появилось `[sudo: authenticate] Password:` — это `sudo`
+спрашивает пароль, а не Docker. Команда здесь запускается через `sudo`, потому что ты пока не
+в группе `docker` (добавим себя в неё в шаге 6 — после этого `sudo` не нужен). Сам вывод Docker
+начинается со строки `Unable to find image…`.
+
 Как читать этот вывод:
 
 | Строки | Что это |
@@ -356,6 +361,9 @@ To generate this message, Docker took the following steps:
  4. The Docker daemon streamed that output to the Docker client, which sent it
     to your terminal.
 ```
+
+**Про запрос пароля:** `[sudo: authenticate] Password:` в начале — это `sudo`, а не Docker (в группе
+`docker` ты ещё не состоишь, это шаг 6).
 
 Здесь: `Status: Downloaded newer image` — образ скачался из Docker Hub, `(amd64)` — архитектура
 (на ARM было бы `arm64`), `Digest` — отпечаток версии образа. Дальше образ печатает рекламу
@@ -727,10 +735,11 @@ docker info --format 'root={{.DockerRootDir}} driver={{.Driver}} cgroup={{.Cgrou
 **Проверка 4 — контейнер запускается:**
 
 ```bash
-sudo docker run --rm hello-world
+docker run --rm hello-world
 ```
 
-**Ключи:** `run` — создать и запустить контейнер; `--rm` — удалить его после выхода.
+**Ключи:** `run` — создать и запустить контейнер; `--rm` — удалить его после выхода. Здесь уже
+**без `sudo`** — ты добавил себя в группу на шаге 6.
 
 **Ожидаемо:** на первом запуске Docker сначала скачивает образ, потом печатает приветствие:
 
@@ -755,8 +764,9 @@ To generate this message, Docker took the following steps:
     to your terminal.
 ```
 
-Строка `[sudo: authenticate] Password:` выше в твоём терминале — это **не** Docker просит пароль,
-а `sudo` (ты ещё не в группе `docker`). После шага 6 команда пойдёт без пароля.
+Если вместо этого появилось `permission denied … docker.sock` — группа не применилась к текущей
+сессии: выполни `newgrp docker` или открой новый терминал. Временно можно добавить `sudo`
+(тогда первой строкой будет запрос пароля — это `sudo`, а не Docker).
 
 В `docker ps -a` контейнера после этого нет — его удалил `--rm`.
 

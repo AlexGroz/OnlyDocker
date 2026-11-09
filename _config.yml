@@ -32,5 +32,11 @@ exclude:
 defaults:
   - scope:
       path: ""
+      type: pages
+    values:
+      render_with_liquid: false
+  - scope:
+      path: "book"
+      type: pages
     values:
       render_with_liquid: false

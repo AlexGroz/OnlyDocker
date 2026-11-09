@@ -37,6 +37,9 @@ mkdir -p ~/docker-lab/reports
 } | tee ~/docker-lab/reports/env-report.txt
 ```
 
+**Ключи:** здесь те же команды, что в главе 0, и каждый ключ там разобран — вернись к 0.1–0.10,
+если хоть один вызывает вопрос. Новых ключей в этом блоке нет.
+
 </details>
 
 **Готов идти дальше, если:** `command -v docker` ничего не вывел, а `stat -fc %T /sys/fs/cgroup`
@@ -85,11 +88,21 @@ Docker — это не «виртуалка» и не один бинарник,
 
 > **В проде:** официальный репозиторий Docker + фиксация версии
 > (`sudo apt-mark hold docker-ce`), чтобы ночное обновление не уронило ноды.
+> snap — это десктоп и быстрые тесты. `docker.io` — когда нужен минимум движений
+> и версия не критична (например, CI-раннер внутри той же ОС).
+
+---
+
 ## 1.3. Способ 1 из 3: snap-пакет
 
 ```bash
 sudo snap install docker
 ```
+
+**Ключи:** `sudo` — выполнить от имени root (установка пакетов требует прав);
+`snap install <имя>` — поставить snap-пакет из Snap Store, канал по умолчанию `latest/stable`;
+здесь **нет** `--classic`, потому что Docker в Snap Store поставляется в изолированном режиме
+со своими ограничениями — это и есть источник отличий от обычного пакета.
 
 **Что произошло:** snap скачал самодостаточный пакет (`docker` 29.8.0, ~154 МБ) и поднял
 systemd-сервисы. Важно понимать: этот snap собирает **Canonical**, а не Docker, Inc. —
@@ -101,6 +114,10 @@ systemd-сервисы. Важно понимать: этот snap собира�
 snap list docker && snap services docker
 ```
 
+**Ключи:** `snap list <имя>` — установленные snap-пакеты (версия, ревизия, канал, заметки);
+`snap services <имя>` — systemd-сервисы, которые создал snap (у Docker их два: демон и
+вспомогательный), и их состояние.
+
 **Ожидаемо:** строка `docker 29.8.0 …` и два сервиса в статусе `active`.
 
 **Проверка 2 — клиент и демон отвечают:**
@@ -109,12 +126,21 @@ snap list docker && snap services docker
 docker version --format 'CLI {{.Client.Version}} / server {{.Server.Version}}'
 ```
 
+**Ключи:** `--format` (он же `-f`) принимает **шаблон Go**: текст внутри `{{ }}` — это поле из
+ответа демона. `.Client` — твой CLI, `.Server` — демон, `.Version` — номер версии. Тот же приём
+работает во всех командах Docker: `docker inspect -f '{{.State.Status}}' <имя>`.
+
 **Проверка 3 — где snap держит данные:**
 
 ```bash
 docker info --format 'root={{.DockerRootDir}} driver={{.Driver}} cgroup={{.CgroupVersion}}'
 ls -l /var/run/docker.sock
 ```
+
+**Ключи:** `docker info` — состояние демона целиком; `--format` — вывести только нужные поля:
+`.DockerRootDir` — каталог данных, `.Driver` — драйвер хранилища слоёв, `.CgroupVersion` — версия
+cgroup. `ls -l` — длинный формат, чтобы увидеть права и владельца сокета: сокет принадлежит
+`root:docker`, и именно поэтому обычный пользователь получает `permission denied`.
 
 **Ожидаемо:** путь данных вида `/var/snap/docker/common/var-lib-docker` — не `/var/lib/docker`,
 как у обычного пакета. Вот это и есть главная особенность snap-версии: у неё своё дерево
@@ -126,6 +152,10 @@ ls -l /var/run/docker.sock
 sudo docker run --rm hello-world
 ```
 
+**Ключи:** `docker run <образ>` — создать контейнер из образа и запустить его;
+`--rm` — удалить контейнер сразу после завершения (без него он останется в `docker ps -a`
+со статусом `Exited`); `hello-world` — имя образа без тега, то есть `:latest`.
+
 Если `docker ps` под своим пользователем отвечает `permission denied`, добавь себя в группу:
 `sudo adduser $USER docker`, затем перелогинься.
 
@@ -135,11 +165,19 @@ sudo docker run --rm hello-world
 sudo snap remove --purge docker
 ```
 
+**Ключи:** `snap remove <имя>` — удалить snap-пакет; `--purge` — удалить вместе с ним **данные и
+снапшоты** (`/var/snap/docker/...`). Без `--purge` данные остались бы на диске, и следующий
+эксперимент начался бы не с чистого листа.
+
 **Проверка отката:**
 
 ```bash
 snap list docker ; ls /var/snap/docker 2>/dev/null ; command -v docker || echo "docker удалён"
 ```
+
+**Ключи:** `;` — выполнять команды по порядку, **невзирая** на результат предыдущей (в отличие от
+`&&`); `ls /var/snap/docker` — проверить, остались ли данные; `2>/dev/null` — не показывать ошибку,
+если каталога нет; `command -v … || echo` — подставить текст, если бинарника нет.
 
 **Ожидаемо:** `error: no matching snaps installed`, каталога нет, `docker удалён`.
 
@@ -151,6 +189,10 @@ snap list docker ; ls /var/snap/docker 2>/dev/null ; command -v docker || echo "
 sudo apt update && sudo apt install -y docker.io docker-buildx docker-compose-v2
 ```
 
+**Ключи:** `apt update` — обновить **индексы** пакетов (список того, что доступно), сами пакеты
+не трогает; `apt install` — установить перечисленные пакеты и их зависимости;
+`-y` (`--assume-yes`) — не задавать вопрос «Продолжить? [Y/n]», нужно для скриптов.
+
 **Что произошло:** поставились `docker.io` (демон + CLI), зависимости `containerd`, `runc`,
 и **отдельно** — плагины `buildx` и `compose` (в этом пакете они не входят в комплект,
 в отличие от официального).
@@ -161,11 +203,18 @@ sudo apt update && sudo apt install -y docker.io docker-buildx docker-compose-v2
 dpkg -l | grep -E '^ii +(docker|containerd|runc)' | awk '{print $2, $3}'
 ```
 
+**Ключи:** `dpkg -l` — список пакетов и их состояние; `^ii` в шаблоне — «установлен и настроен»
+(первая `i` — желаемое состояние, вторая — текущее); `awk '{print $2, $3}'` — оставить только
+2-ю и 3-ю колонки, то есть имя пакета и версию, без служебных флагов.
+
 **Проверка 2 — сервис поднялся и включён в автозапуск:**
 
 ```bash
 systemctl is-active docker; systemctl is-enabled docker
 ```
+
+**Ключи:** `systemctl is-active <юнит>` — запущен ли сервис **сейчас** (печатает `active`/`inactive`,
+а не всю портянку статуса); `is-enabled` — включён ли автозапуск при загрузке (`enabled`/`disabled`).
 
 **Ожидаемо:** `active` и `enabled`.
 
@@ -174,6 +223,10 @@ systemctl is-active docker; systemctl is-enabled docker
 ```bash
 docker version --format 'server {{.Server.Version}}'; docker compose version; docker buildx version
 ```
+
+**Ключи:** `--format` — шаблон Go (см. выше), здесь печатаем только версию **демона**;
+`docker compose version` и `docker buildx version` — не самостоятельные программы, а **плагины**
+CLI; если плагина нет, Docker ответит `'compose' is not a docker command`.
 
 **Ожидаемо:** сервер `29.1.3` — ровно то, что предлагал `apt-cache policy docker.io` в главе 0.
 Если `docker compose version` ругается — значит плагин не встал, проверь
@@ -185,11 +238,17 @@ docker version --format 'server {{.Server.Version}}'; docker compose version; do
 sudo docker run --rm hello-world
 ```
 
+**Ключи:** те же, что выше: `run` — создать и запустить, `--rm` — удалить после выхода.
+
 **Проверка 5 — откуда взялась версия:**
 
 ```bash
 apt-cache policy docker.io | sed -n '1,4p'
 ```
+
+**Ключи:** `apt-cache policy <пакет>` — установленная и доступная версии и их источник;
+`sed -n '1,4p'` — показать только первые 4 строки (там уже есть всё нужное, дальше идёт длинная
+таблица версий).
 
 > **В проде:** этот способ плох тем, что версию Docker определяет Ubuntu, и обновление
 > системы может внезапно обновить демон. Зато минимум действий и нет сторонних репозиториев —
@@ -202,6 +261,11 @@ sudo apt purge -y docker.io docker-buildx docker-compose-v2 containerd runc
 sudo rm -rf /var/lib/docker /var/lib/containerd /etc/docker
 sudo apt autoremove -y --purge
 ```
+
+**Ключи:** `apt purge` — удалить пакет **вместе с конфигурационными файлами** (в отличие от
+`apt remove`, который конфиги оставляет); `rm -rf` — снести каталоги данных (образы, контейнеры,
+тома) — это необратимо; `apt autoremove --purge` — убрать зависимости, которые больше никому
+не нужны, тоже вместе с конфигами.
 
 **Проверка отката:**
 
@@ -223,11 +287,19 @@ Ansible-роли или в README любого вменяемого проект
 sudo apt update && sudo apt install -y ca-certificates curl gnupg
 ```
 
+**Ключи:** те же `apt update` и `-y`, что и выше; назначение пакетов: `ca-certificates` —
+корневые сертификаты для HTTPS, `curl` — скачать ключ, `gnupg` (`gpg`) — преобразовать его в формат,
+который понимает `apt`.
+
 **Проверка:**
 
 ```bash
 dpkg -l ca-certificates curl gnupg 2>/dev/null | grep -c '^ii'
 ```
+
+**Ключи:** `dpkg -l <пакеты>` — состояние **конкретных** пакетов (а не всего списка);
+`grep -c` — посчитать совпавшие строки: `3` значит все три установлены;
+`2>/dev/null` — скрыть строку ошибки, если пакета нет вовсе.
 
 **Ожидаемо:** `3` — все три пакета стоят.
 
@@ -236,6 +308,10 @@ dpkg -l ca-certificates curl gnupg 2>/dev/null | grep -c '^ii'
 ```bash
 sudo install -m 0755 -d /etc/apt/keyrings
 ```
+
+**Ключи:** `install` — «умный `mkdir` + `chmod`»: `-d` создать каталог, `-m 0755` сразу задать
+права (владелец `rwx`, остальные `r-x`). Одной командой получаем каталог с нужными правами,
+без отдельного `chmod`.
 
 **Зачем:** современный Debian/Ubuntu требует, чтобы сторонние ключи лежали в
 `/etc/apt/keyrings` и были привязаны к конкретному репозиторию (`signed-by=`) — а не
@@ -248,6 +324,9 @@ sudo install -m 0755 -d /etc/apt/keyrings
 ls -ld /etc/apt/keyrings
 ```
 
+**Ключи:** `-l` — длинный формат (права, владелец), `-d` (`--directory`) — показать **сам каталог**,
+а не его содержимое. Без `-d` `ls` вывел бы файлы внутри.
+
 **Ожидаемо:** `drwxr-xr-x … root root … /etc/apt/keyrings`.
 
 ### Шаг 3. GPG-ключ репозитория
@@ -257,6 +336,12 @@ curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
   | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 sudo chmod a+r /etc/apt/keyrings/docker.gpg
 ```
+
+**Ключи:** `curl -f` (`--fail`) — считать ошибкой HTTP-код ≥ 400 (иначе `curl` молча запишет
+страницу ошибки вместо ключа); `-s` (`--silent`) — без прогресса; `-S` (`--show-error`) — но текст
+ошибки показывать; `-L` (`--location`) — идти по редиректам. `gpg --dearmor` — превратить
+текстовый («бронированный») ключ в бинарный формат `apt`; `-o файл` — куда писать результат.
+`chmod a+r` — `a` (all, все) `+r` (добавить чтение): `apt` читает ключ не от root.
 
 **Что произошло:** `gpg --dearmor` превратил текстовый ключ в бинарный формат, который
 понимает `apt` (раньше он шёл с расширением `.asc` — тоже валидно).
@@ -268,6 +353,10 @@ ls -l /etc/apt/keyrings/docker.gpg
 sudo gpg --no-default-keyring --keyring /etc/apt/keyrings/docker.gpg --list-keys | head -6
 ```
 
+**Ключи:** `gpg --no-default-keyring` — не смотреть в личную связку ключей пользователя;
+`--keyring <файл>` — работать именно с этим файлом; `--list-keys` — показать, какие ключи внутри;
+`head -6` — первые шесть строк вывода.
+
 **Ожидаемо:** файл размером ~3 КБ и в выводе `gpg` — ключ Docker (`Docker Release (CE deb) …`).
 
 ### Шаг 4. Подключение самого репозитория
@@ -277,6 +366,12 @@ echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.
   | sudo tee /etc/apt/sources.list.d/docker.list
 sudo apt update
 ```
+
+**Ключи:** `echo` печатает строку, а `| sudo tee <файл>` записывает её в файл **от root**
+(`tee` нужен потому, что `sudo echo … > файл` перенаправление выполняет твоя оболочка, а не `sudo`,
+и она упрётся в права). `$(...)` — подстановка: `arch=…` и кодовое имя берутся из системы.
+Внутри квадратных скобок — атрибуты источника: `arch=` — под какую архитектуру,
+`signed-by=` — каким ключом проверять подпись; `stable` — ветка репозитория.
 
 **Что произошло:** добавлен источник `…/linux/ubuntu resolute stable`. Обрати внимание: ветка и
 архитектура подставляются из системы — на Ubuntu 24.04 получилось бы `noble`, на ARM — `arm64`.
@@ -302,6 +397,9 @@ apt-cache policy docker-ce | sed -n '1,6p'
 sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 ```
 
+**Ключи:** `-y` — не спрашивать подтверждения (для скриптов и Ansible); `apt install` сам подтянет
+зависимости, поэтому `runc` и часть библиотек ты не перечисляешь. Роли пяти пакетов — в таблице ниже.
+
 **Что именно ставим:** `docker-ce` — демон, `docker-ce-cli` — клиент, `containerd.io` —
 рантайм (отдельный, свежий), `docker-buildx-plugin` — сборка образов, `docker-compose-plugin` —
 `docker compose`.
@@ -313,17 +411,29 @@ docker version --format 'CLI {{.Client.Version}} / server {{.Server.Version}} '
 docker version --format 'API {{.Server.APIVersion}} / Go {{.Server.GoVersion}}'
 ```
 
+**Ключи:** `--format` — шаблон Go; `.Client` — твой CLI, `.Server` — демон;
+`.APIVersion` — версия HTTP API (важна для совместимости инструментов), `.GoVersion` — на какой
+версии Go собран демон. Две команды — потому что в одном шаблоне удобно держать одну тему.
+
 **Проверка 2 — сервис:**
 
 ```bash
 systemctl is-active docker; systemctl is-enabled docker; systemctl status docker --no-pager | head -5
 ```
 
+**Ключи:** `is-active` и `is-enabled` объяснены выше; `status` — полный статус юнита (последние
+строчки лога, главный PID, cgroup); `--no-pager` — не открывать `less` (иначе вывод «залипнет»
+в ожидании `q`); `head -5` — первые пять строк.
+
 **Проверка 3 — что демон о себе думает:**
 
 ```bash
 docker info --format 'root={{.DockerRootDir}} driver={{.Driver}} cgroup={{.CgroupVersion}} runtime={{.DefaultRuntime}}'
 ```
+
+**Ключи:** `--format` с полями: `.DockerRootDir` — где лежат образы и тома, `.Driver` — драйвер
+слоёв (`overlay2` — норма), `.CgroupVersion` — версия cgroup (ждём `2`), `.DefaultRuntime` — чем
+запускаются контейнеры (`runc`).
 
 **Ожидаемо:** `root=/var/lib/docker`, `driver=overlay2`, `cgroup=2`, `runtime=runc`.
 
@@ -332,6 +442,8 @@ docker info --format 'root={{.DockerRootDir}} driver={{.Driver}} cgroup={{.Cgrou
 ```bash
 sudo docker run --rm hello-world
 ```
+
+**Ключи:** `run` — создать и запустить контейнер; `--rm` — удалить его после выхода.
 
 **Проверка 5 — плагины:**
 
@@ -345,12 +457,20 @@ docker compose version && docker buildx version
 journalctl -u docker --no-pager -n 10
 ```
 
+**Ключи:** `-u docker` (`--unit`) — только записи этого systemd-юнита; `-n 10` (`--lines`)
+последние 10 строк; `--no-pager` — без постраничного просмотра. Это первая команда при любом
+«Docker не стартует»: там будет причина (`invalid JSON`, `failed to start daemon` и т.п.).
+
 ### Шаг 6. Работа без `sudo`
 
 ```bash
 sudo usermod -aG docker "$USER"
 newgrp docker
 ```
+
+**Ключи:** `usermod -aG <группа> <пользователь>` — **добавить** (`-a`, `--append`) пользователя в
+**дополнительные** группы (`-G`), не затирая остальные: без `-a` список групп был бы **перезаписан**
+и ты потерял бы `sudo`. `newgrp docker` — переоткрыть оболочку с новой группой без выхода из системы.
 
 **Что произошло:** пользователь добавлен в группу `docker`; `newgrp docker` переоткрывает
 сессию с новой группой (альтернатива — выйти из терминала и зайти снова).
@@ -360,6 +480,11 @@ newgrp docker
 ```bash
 id -nG | tr ' ' '\n' | grep -x docker && docker ps
 ```
+
+**Ключи:** `id -nG` — группы именами; `tr ' ' '\n'` — заменить пробелы переводами строк, чтобы
+группы шли по одной в строке; `grep -x docker` (`--line-regexp`) — строка должна быть **ровно**
+`docker` (иначе совпало бы что-то вроде `docker-compose`); `&&` — `docker ps` выполнится только если
+группа найдена.
 
 **Ожидаемо:** вывелось `docker`, а `docker ps` показал пустую таблицу **без** `sudo`.
 Если всё ещё `permission denied` — группа не применилась к текущей сессии.
@@ -401,6 +526,10 @@ docker info --format 'log-driver={{.LoggingDriver}} live-restore={{.LiveRestoreE
 systemctl is-active docker
 ```
 
+**Ключи:** `--format` с полями `.LoggingDriver` (какой драйвер логов выбран) и
+`.LiveRestoreEnabled` (`true`/`false` — переживают ли контейнеры перезапуск демона);
+`systemctl is-active` — живой ли демон после `restart`.
+
 **Ожидаемо:** `log-driver=json-file live-restore=true` и `active`.
 
 **Проверка 3 — настройка применилась к новым контейнерам:**
@@ -411,6 +540,11 @@ docker inspect -f '{{json .HostConfig.LogConfig}}' lab-logcheck
 docker rm -f lab-logcheck
 ```
 
+**Ключи:** `docker run -d` (`--detach`) — запустить в фоне и сразу вернуть терминал;
+`> /dev/null` — выбросить длинный ID контейнера, он нам не нужен;
+`inspect -f '{{json …}}'` — вывести выбранное поле **в виде JSON** (так видно вложенные опции);
+`docker rm -f` — удалить контейнер принудительно, даже работающий.
+
 **Ожидаемо:** в JSON видно `"Type":"json-file"` и опции `max-size`/`max-file`.
 
 **Проверка 4 — что демон всё ещё полностью работоспособен:**
@@ -419,6 +553,9 @@ docker rm -f lab-logcheck
 docker run --rm hello-world | head -3
 docker compose version
 ```
+
+**Ключи:** `run --rm` — запустить и сразу удалить контейнер; `head -3` — первые три строки вывода
+(проверяем, что демон вообще работает); `compose version` — что плагин на месте.
 
 > **В проде:** рядом с `daemon.json` обычно живут `data-root` (перенос данных на отдельный диск)
 > и `default-address-pools` (когда стандартная подсеть `172.17.0.0/16` конфликтует с корпоративной
@@ -439,6 +576,9 @@ docker compose version
 docker version --format 'Docker {{.Server.Version}} готов к работе'
 ```
 
+**Ключи:** `--format` — шаблон Go; `{{.Server.Version}}` — версия сервера, остальной текст в
+шаблоне печатается как есть.
+
 ---
 
 ## 1.8. Чек-лист самопроверки (глава 1)
@@ -453,6 +593,7 @@ docker version --format 'Docker {{.Server.Version}} готов к работе'
 | Ты в группе docker? | `id -nG \| tr ' ' '\n' \| grep -x docker` |
 | Откуда взят пакет? | `apt-cache policy docker-ce` |
 | Работают плагины? | `docker compose version; docker buildx version` |
+
 ---
 
 ## 1.9. Откат главы 1: снести Docker полностью
@@ -481,6 +622,12 @@ sudo apt autoremove -y --purge
 sudo apt update
 ```
 
+**Ключи:** `systemctl stop <юниты>` — остановить сейчас (автозапуск выключится только вместе с
+пакетом); `apt purge` — удалить пакет вместе с конфигами; `rm -rf` — снести данные;
+`rm -f` — удалить файлы без вопросов и без ошибки, если их уже нет; `gpasswd -d <пользователь>
+<группа>` — **удалить** (`-d`) пользователя из группы; `apt autoremove --purge` — убрать ненужные
+зависимости вместе с их конфигами; `apt update` — перечитать индексы уже без удалённого репозитория.
+
 **Проверка отката — пять независимых подтверждений:**
 
 ```bash
@@ -491,6 +638,11 @@ apt-cache policy docker-ce | sed -n '1,2p'
 id -nG | tr ' ' '\n' | grep -x docker || echo "3) не в группе docker"
 docker ps 2>&1 | head -1
 ```
+
+**Ключи:** `systemctl status docker 2>&1` — соединить поток ошибок с обычным выводом, иначе текст
+`Unit … could not be found` (он идёт в stderr) не попадёт в `head`; `ls … 2>/dev/null` — не показывать
+ошибку, если каталогов нет; `sed -n '1,2p'` — только две строки `apt-cache policy`;
+`docker ps 2>&1 | head -1` — первая строка ошибки от Docker, которого уже нет.
 
 **Ожидаемо:**
 
@@ -509,6 +661,9 @@ docker ps 2>&1 | head -1
 ---
 
 ## 1.10. Шпаргалка главы
+
+Ключи здесь не разбираются — они разобраны в шагах выше. Шпаргалка нужна для быстрого
+подсматривания, а не для первого знакомства.
 
 ```bash
 # --- snap ---

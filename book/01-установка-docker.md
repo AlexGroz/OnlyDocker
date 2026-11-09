@@ -206,7 +206,7 @@ Unable to find image 'hello-world:latest' locally
 latest: Pulling from library/hello-world
 4f55086f7dd0: Pull complete
 d5e71e642bf5: Download complete
-Digest: sha256:c567b231f65614688711a75f31518a064258a51d442117a3e771a3a8fdba78ef
+Digest: sha256:…      ← у тебя будет свой отпечаток (зависит от версии образа)
 Status: Downloaded newer image for hello-world:latest
 
 Hello from Docker!

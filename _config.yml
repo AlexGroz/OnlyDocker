@@ -25,3 +25,12 @@ plugins:
 
 exclude:
   - .gitignore
+
+# Отключаем обработку Liquid на страницах книги: иначе движок GitHub Pages
+# съедает шаблоны Docker вида {{.State.Status}}, и на странице остаётся пустая
+# команда «--format 'CLI  / server '». Тема, адреса страниц и вид не меняются.
+defaults:
+  - scope:
+      path: ""
+    values:
+      render_with_liquid: false
